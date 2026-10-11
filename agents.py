@@ -7,14 +7,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-model = ChatGroq(model="openai/gpt-oss-120b", temperature=0.5)
 
-
+fast_model = ChatGroq(model="openai/gpt-oss-20b", temperature=0.3)    # search, reader, critic
+writer_model = ChatGroq(model="openai/gpt-oss-120b", temperature=0.5)  # writer only
 
 # 1st agent
 def build_search_agent():
     return create_agent(
-        model = model,
+        model = fast_model,
         tools = [web_search]
     )
 
@@ -22,7 +22,7 @@ def build_search_agent():
 # 2nd agent
 def build_reader_agent():
     return create_agent(
-        model = model,
+        model = fast_model,
         tools = [scrape_url]
     )
 
@@ -46,7 +46,7 @@ Structure the report as:
 Be detailed, factual and professional."""),
 ])
 
-writer_chain = writer_prompt | model | StrOutputParser()
+writer_chain = writer_prompt | writer_model | StrOutputParser()
 
 
 #critical thinking chain
@@ -74,4 +74,4 @@ One line verdict:
 ..."""),
 ])
 
-critic_chain = critic_prompt | model | StrOutputParser()
+critic_chain = critic_prompt | fast_model | StrOutputParser()

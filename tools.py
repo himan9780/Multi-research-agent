@@ -75,7 +75,7 @@ def scrape_url(url: str) -> str:
         if not text:
             return f"No readable text found at: {url}"
 
-        return text[:10000]
+        return text[:4000]
 
     except requests.exceptions.HTTPError as e:
         status = e.response.status_code if e.response is not None else "unknown"

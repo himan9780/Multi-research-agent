@@ -6,6 +6,7 @@ Run with:  streamlit run app.py
 import re
 import time
 from datetime import datetime
+from groq import RateLimitError
 
 import streamlit as st
 
@@ -247,6 +248,27 @@ def extract_urls(text: str) -> list:
 # ──────────────────────────────────────────────────────────────
 # Pipeline runner (same flow as pipeline.py, with live UI updates)
 # ──────────────────────────────────────────────────────────────
+def call_with_retry(func, payload, status_slot, max_attempts=4):
+    """Run func(payload). On a Groq rate limit, wait the suggested time and retry."""
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return func(payload)
+        except RateLimitError as error:
+            if attempt == max_attempts:
+                raise
+
+            match = re.search(r"try again in (?:(\d+)m)?(\d+(?:\.\d+)?)s", str(error))
+            if match:
+                minutes = int(match.group(1) or 0)
+                wait = minutes * 60 + float(match.group(2)) + 2
+            else:
+                wait = 20
+
+            for remaining in range(int(wait), 0, -1):
+                status_slot.warning(f"⏳ Rate limit reached. Retrying in {remaining}s...")
+                time.sleep(1)
+
+
 def run_pipeline(topic: str, stepper_slot, status_slot) -> dict:
     state = {"topic": topic}
     started = time.time()
@@ -283,8 +305,8 @@ def run_pipeline(topic: str, stepper_slot, status_slot) -> dict:
     status_slot.info("✍️ The writer is drafting your report...")
 
     research_combined = (
-        f"SEARCH RESULTS : \n {state['search_results']} \n\n"
-        f"DETAILED SCRAPED CONTENT : \n {state['scraped_content']}"
+    f"SEARCH RESULTS : \n {state['search_results'][:2500]} \n\n"
+    f"DETAILED SCRAPED CONTENT : \n {state['scraped_content'][:4000]}"
     )
     state["report"] = writer_chain.invoke({
         "topic": topic,
